@@ -59,6 +59,7 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:-apple-sy
 .hbtn.s1{border:1.5px solid var(--or);background:var(--or-bg)}
 .hbtn.s2{border:1.5px solid var(--ac);background:var(--ac-bg)}
 .hbtn.s3{border:1.5px solid var(--gn);background:var(--gn-bg)}
+.hbtn.s1.dim,.hbtn.s2.dim,.hbtn.s3.dim{opacity:.3;border-style:dashed}
 .hnum{width:32px;height:32px;border-radius:50%;background:var(--sf2);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--tx)}
 .hbtn.sn .hnum{background:#4a8a6e;color:#fff}
 .hbtn.sa .hnum{background:var(--gd);color:#000}
@@ -156,6 +157,11 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:-apple-sy
 .sel-line{display:flex;align-items:baseline;gap:8px}
 .sel-role{font-size:11px;font-weight:700;color:var(--mt);flex-shrink:0;min-width:42px}
 .sel-nums{font-size:13px;font-weight:600;color:var(--tx);letter-spacing:.02em}
+.form-row-tabs{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.form-row-tab{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:var(--r);border:1.5px solid var(--bd2);background:var(--sf);cursor:pointer;font-size:13px;font-weight:600;color:var(--mt);text-align:left;width:100%}
+.form-row-tab.active{border-color:var(--ac);background:var(--ac-bg);color:var(--tx)}
+.form-row-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.hbtn.dim{opacity:.35}
 .hist-unjudged-badge{font-size:10px;font-weight:600;color:var(--or);background:var(--or-bg);padding:2px 7px;border-radius:5px}
 .cal{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rl);overflow:hidden;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
 .cal-hdr{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--bd);background:#4a8a6e}
@@ -297,7 +303,7 @@ var LEGENDS={"axis1-2":[["var(--gd)","軸"],["var(--gn)","相手"]],"axis1-3":[[
 var STEP_ICONS=["📅","📍","🏁","🎫","🐴","💴","✓"];
 var STEP_LBLS=["日付","競馬場","レース","馬券","馬番","金額","確認"];
 
-var S={step:0,selDate:null,calY:new Date().getFullYear(),calM:new Date().getMonth(),venue:null,race:null,betType:null,method:"normal",sel:{},amount:100,history:[],balance:10000,histView:"dates",histDate:null,histRaceKey:null,numHorses:18};
+var S={step:0,selDate:null,calY:new Date().getFullYear(),calM:new Date().getMonth(),venue:null,race:null,betType:null,method:"normal",sel:{},amount:100,history:[],balance:10000,histView:"dates",histDate:null,histRaceKey:null,numHorses:18,formRow:1};
 
 // ─── ユーティリティ ────────────────────────────────────
 function fmt(n){return"\u00a5"+Math.round(n).toLocaleString();}
@@ -539,7 +545,7 @@ function getHorseCls(n){
   var m=S.method;
   if(m==="normal"||m==="box")return(S.sel.horses||[]).indexOf(n)>=0?"sn":"";
   if(m==="axis1"||m==="axis1m"||m==="axis2"||m==="axis2m"){if((S.sel.axis||[]).indexOf(n)>=0)return"sa";if((S.sel.partner||[]).indexOf(n)>=0)return"sp";return"";}
-  if(m==="form"){if((S.sel.row1||[]).indexOf(n)>=0)return"s1";if((S.sel.row2||[]).indexOf(n)>=0)return"s2";if((S.sel.row3||[]).indexOf(n)>=0)return"s3";return"";}
+  if(m==="form"){var i1=(S.sel.row1||[]).indexOf(n)>=0,i2=(S.sel.row2||[]).indexOf(n)>=0,i3=(S.sel.row3||[]).indexOf(n)>=0,ar=S.formRow;if(ar===1&&i1)return"s1";if(ar===2&&i2)return"s2";if(ar===3&&i3)return"s3";if(i1)return"s1 dim";if(i2)return"s2 dim";if(i3)return"s3 dim";return"";}
   return"";
 }
 function getOrd(n){
@@ -551,7 +557,7 @@ function toggleH(n){
   if(m==="normal"||m==="box"){if(!S.sel.horses)S.sel.horses=[];var idx=S.sel.horses.indexOf(n);if(idx>=0)S.sel.horses.splice(idx,1);else if(m==="normal"){if(S.sel.horses.length<bt.minSel)S.sel.horses.push(n);else{S.sel.horses.shift();S.sel.horses.push(n);}}else S.sel.horses.push(n);}
   else if(m==="axis1"||m==="axis1m"){if(!S.sel.axis)S.sel.axis=[];if(!S.sel.partner)S.sel.partner=[];if(S.sel.axis.indexOf(n)>=0)S.sel.axis=S.sel.axis.filter(function(x){return x!==n;});else if(S.sel.partner.indexOf(n)>=0)S.sel.partner=S.sel.partner.filter(function(x){return x!==n;});else if(S.sel.axis.length===0)S.sel.axis=[n];else S.sel.partner.push(n);}
   else if(m==="axis2"||m==="axis2m"){if(!S.sel.axis)S.sel.axis=[];if(!S.sel.partner)S.sel.partner=[];if(S.sel.axis.indexOf(n)>=0)S.sel.axis=S.sel.axis.filter(function(x){return x!==n;});else if(S.sel.partner.indexOf(n)>=0)S.sel.partner=S.sel.partner.filter(function(x){return x!==n;});else if(S.sel.axis.length<2)S.sel.axis.push(n);else S.sel.partner.push(n);}
-  else if(m==="form"){if(!S.sel.row1)S.sel.row1=[];if(!S.sel.row2)S.sel.row2=[];if(!S.sel.row3)S.sel.row3=[];if(S.sel.row1.indexOf(n)>=0){S.sel.row1=S.sel.row1.filter(function(x){return x!==n;});S.sel.row2.push(n);}else if(S.sel.row2.indexOf(n)>=0){S.sel.row2=S.sel.row2.filter(function(x){return x!==n;});S.sel.row3.push(n);}else if(S.sel.row3.indexOf(n)>=0)S.sel.row3=S.sel.row3.filter(function(x){return x!==n;});else S.sel.row1.push(n);}
+  else if(m==="form"){if(!S.sel.row1)S.sel.row1=[];if(!S.sel.row2)S.sel.row2=[];if(!S.sel.row3)S.sel.row3=[];var rowKey="row"+S.formRow;var rowArr=S.sel[rowKey]||[];var rowIdx=rowArr.indexOf(n);if(rowIdx>=0){S.sel[rowKey]=rowArr.filter(function(x){return x!==n;});}else{S.sel[rowKey]=rowArr.concat([n]);}}
   updateHorsesUI();
 }
 
@@ -623,13 +629,29 @@ function renderHorses(){
     w.appendChild(tabs);
   }
   // 凡例
-  var legKey=S.method+"-"+bt.minSel,legendData=LEGENDS[legKey]||[];
-  if(legendData.length){
-    var ld=ce("div","legend");
-    legendData.forEach(function(l){var item=ce("div","leg-item");var dot=ce("div","leg-dot");dot.style.background=l[0];item.appendChild(dot);item.appendChild(document.createTextNode(l[1]));ld.appendChild(item);});
-    w.appendChild(ld);
+    // フォーメーション列タブ
+  if(S.method==="form"){
+    var isTrif=bt.id==="trifecta";
+    var rowLabels=isTrif?["1着","2着","3着"]:["1列目","2列目","3列目"];
+    var rowColors=["#e87000","#4a8a6e","#4a8a6e"];
+    var rowTabs=ce("div","form-row-tabs");
+    [1,2,3].forEach(function(r){
+      var isActive=S.formRow===r;
+      var tab=ce("button","form-row-tab"+(isActive?" active":""));
+      var dot=ce("span","form-row-dot");
+      dot.style.background=r===1?"#e87000":r===2?"#4a8a6e":"#34d399";
+      tab.appendChild(dot);
+      var rowNums=(S.sel["row"+r]||[]);
+      var lbl=ce("span");
+      lbl.textContent=rowLabels[r-1]+(rowNums.length?" ： "+rowNums.join(", "):" （未選択）");
+      if(isActive)lbl.style.color="var(--tx)";
+      tab.appendChild(lbl);
+      (function(row){tab.addEventListener("click",function(){S.formRow=row;renderHorses();});})(r);
+      rowTabs.appendChild(tab);
+    });
+    w.appendChild(rowTabs);
   }
-  // 点数表示
+  var legKey=S.method+"-"+bt.minSel
   var pts=genCombos(bt.id,S.method,S.sel).length;
   var hint=HINTS[legKey]||"馬番を選択";
   var pd=ce("div","ptcount");pd.id="horses-ptcount";

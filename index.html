@@ -60,6 +60,13 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:-apple-sy
 .hbtn.s2{border:1.5px solid var(--ac);background:var(--ac-bg)}
 .hbtn.s3{border:1.5px solid var(--gn);background:var(--gn-bg)}
 .hbtn.s1.dim,.hbtn.s2.dim,.hbtn.s3.dim{opacity:.3;border-style:dashed}
+.excl-toggle-btn{width:100%;padding:10px;border-radius:var(--r);border:1.5px solid var(--or);background:var(--or-bg);color:var(--or);font-size:13px;font-weight:600;cursor:pointer;margin-top:10px}
+.excl-panel{background:var(--sf2);border-radius:var(--r);padding:12px;margin-top:8px;border:1px solid var(--bd)}
+.excl-hint{font-size:11px;color:var(--mt);margin-bottom:10px;line-height:1.5}
+.excl-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.excl-btn{width:40px;height:40px;border-radius:var(--r);border:1px solid var(--bd2);background:var(--sf);color:var(--tx);font-size:13px;font-weight:600;cursor:pointer}
+.excl-btn.sel{border-color:var(--or);background:var(--or-bg);color:var(--or)}
+.excl-apply-btn{width:100%;padding:11px;border-radius:50px;background:var(--or);color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer}
 .hnum{width:32px;height:32px;border-radius:50%;background:var(--sf2);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--tx)}
 .hbtn.sn .hnum{background:#4a8a6e;color:#fff}
 .hbtn.sa .hnum{background:var(--gd);color:#000}
@@ -733,7 +740,7 @@ function purchase(){
   var bt=S.betType,m=S.method,combos=genCombos(bt.id,m,S.sel),pts=combos.length,total=S.amount*pts;
   if(total>S.balance){showToast("残高が不足しています","e");return;}
   var mLabel=(METHODS[bt.id]||[]).filter(function(x){return x.id===m;})[0];mLabel=mLabel?mLabel.label:"通常";
-  S.history.unshift({id:Date.now(),date:S.selDate,venue:S.venue.n,race:S.race,betType:{id:bt.id,label:bt.label},method:{id:m,label:mLabel},combos:combos,sel:JSON.parse(JSON.stringify(S.sel)),unitAmount:S.amount,totalAmount:total,result:null,hitCombos:[],payout:0,numHorses:(bt.id==="bracketQ"?S.numHorses:18)});
+  S.history.unshift({id:Date.now(),date:S.selDate,venue:S.venue.n,race:S.race,betType:{id:bt.id,label:bt.label},method:{id:m,label:mLabel},combos:combos,sel:JSON.parse(JSON.stringify(S.sel)),unitAmount:S.amount,totalAmount:total,result:null,hitCombos:[],payout:0,refund:0,excluded:[],numHorses:(bt.id==="bracketQ"?S.numHorses:18)});
   S.balance-=total;
   S.step=0;S.selDate=null;S.venue=null;S.race=null;S.betType=null;S.method="normal";S.sel={};S.numHorses=18;
   save();renderAll();showToast("購入完了！");
@@ -914,13 +921,24 @@ function renderHistTickets(w){
       item.appendChild(cd);
     }
     var tbot=ce("div","tbot");
-    tbot.appendChild(ce("span","tamt",entry.combos.length+"点×"+fmt(entry.unitAmount)+"="+fmt(entry.totalAmount)));
+    var tbotLeft=ce("div");tbotLeft.style.cssText="display:flex;flex-direction:column;gap:3px";
+    tbotLeft.appendChild(ce("span","tamt",entry.combos.length+"点×"+fmt(entry.unitAmount)+"="+fmt(entry.totalAmount)));
+    if((entry.excluded||[]).length>0){var exlbl=ce("span");exlbl.style.cssText="font-size:11px;color:var(--or);font-weight:600";exlbl.textContent="除外: "+entry.excluded.join(",")+"番 (返還 "+fmt(entry.refund||0)+")";tbotLeft.appendChild(exlbl);}
+    tbot.appendChild(tbotLeft);
     if(entry.result==="judged"&&entry.payout>0)tbot.appendChild(ce("span","tpay","払戻 "+fmt(entry.payout)));
     item.appendChild(tbot);ticketWrap.appendChild(item);
   });
   w.appendChild(ticketWrap);
 
   // 未判定があれば着順入力
+  // 除外ボタン（常に表示）
+  var exclUid=(S.histDate+S.histRaceKey).replace(/[^a-zA-Z0-9]/g,"");
+  var exclBtn=ce("button","excl-toggle-btn");
+  exclBtn.textContent="🚫 除外処理";
+  var exclArea=ce("div");exclArea.id="excl-area-"+exclUid;
+  (function(d,rk,u){exclBtn.addEventListener("click",function(){showExcludePanel(d,rk,u);});})(S.histDate,S.histRaceKey,exclUid);
+  w.appendChild(exclBtn);w.appendChild(exclArea);
+
   if(raceEntries.some(function(e){return e.result===null;})){
     var uid=(S.histDate+S.histRaceKey).replace(/[^a-zA-Z0-9]/g,"");
     var rsec=ce("div","rsec");rsec.style.marginTop="12px";
@@ -997,6 +1015,123 @@ function applyPayoutsByRace(date,raceKey,uid,tids){
   });
   S.balance+=won;save();renderBal();renderHistory();
   showToast(won>0?"払戻 "+fmt(won)+" を記録しました！":"判定完了");
+}
+
+/* ── 除外処理 ── */
+function showExcludePanel(date, raceKey, uid){
+  var area = ge("excl-area-"+uid);
+  if(!area) return;
+  if(area.innerHTML !== ""){area.innerHTML="";return;} // トグル
+
+  var entries = S.history.filter(function(e){
+    return e.date===date && e.venue+"-"+e.race===raceKey;
+  });
+  var allHorses = new Set();
+  entries.forEach(function(e){
+    e.combos.forEach(function(c){c.forEach(function(h){allHorses.add(h);});});
+  });
+  var horses = Array.from(allHorses).sort(function(a,b){return a-b;});
+
+  // 現在の除外馬（エントリ間で共通のものを取得）
+  var currentExcluded = entries.length > 0 ? (entries[0].excluded||[]).slice() : [];
+
+  var html = '<div class="excl-panel">';
+  html += '<p class="excl-hint">除外になった馬番を選択してください。除外馬を含む組み合わせは返還されます。</p>';
+  html += '<div class="excl-grid">';
+  horses.forEach(function(h){
+    var isSel = currentExcluded.indexOf(h) >= 0;
+    html += '<button class="excl-btn'+(isSel?" sel":"")+'" data-horse="'+h+'">'+h+'</button>';
+  });
+  html += '</div>';
+  html += '<button class="excl-apply-btn" id="excl-apply-'+uid+'">除外処理を適用</button>';
+  html += '</div>';
+  area.innerHTML = html;
+
+  // 馬番ボタンのトグル
+  area.querySelectorAll('.excl-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      btn.classList.toggle('sel');
+    });
+  });
+
+  // 適用ボタン
+  var applyBtn = ge("excl-apply-"+uid);
+  if(applyBtn){
+    (function(d, rk, u){
+      applyBtn.addEventListener('click', function(){
+        var selBtns = area.querySelectorAll('.excl-btn.sel');
+        var excluded = [];
+        selBtns.forEach(function(b){ excluded.push(parseInt(b.getAttribute('data-horse'))); });
+        applyExclude(d, rk, excluded);
+      });
+    })(date, raceKey, uid);
+  }
+}
+
+function isBracketQValid(combo, excluded, numHorses){
+  // 枠連の組み合わせ[b1,b2]が除外後も成立するか判定
+  var bmap = getBracketMap(numHorses);
+  var b1 = combo[0], b2 = combo[1];
+  // 各枠に何頭残っているか数える
+  var remaining = {};
+  for(var h=1; h<=numHorses; h++){
+    var br = bmap[h];
+    if(!remaining[br]) remaining[br] = 0;
+    if(excluded.indexOf(h) < 0) remaining[br]++;
+  }
+  if(b1 === b2){
+    // 同枠: 枠内に2頭以上残っている必要がある
+    return (remaining[b1] || 0) >= 2;
+  } else {
+    // 異枠: 両枠にそれぞれ1頭以上残っている必要がある
+    return (remaining[b1] || 0) >= 1 && (remaining[b2] || 0) >= 1;
+  }
+}
+
+function applyExclude(date, raceKey, excluded){
+  var entries = S.history.filter(function(e){
+    return e.date===date && e.venue+"-"+e.race===raceKey;
+  });
+  var totalRefund = 0;
+  entries.forEach(function(e){
+    e.excluded = excluded;
+    if(excluded.length === 0){
+      // 除外解除：返還額をリセット
+      S.balance -= (e.refund || 0);
+      e.refund = 0;
+      e.combos = genCombos(e.betType.id, e.method.id, e.sel);
+      e.totalAmount = e.unitAmount * e.combos.length;
+    } else {
+      var originalCombos = genCombos(e.betType.id, e.method.id, e.sel);
+      var validCombos;
+      if(e.betType.id === "bracketQ"){
+        // 枠連専用判定：枠単位で成立するか確認
+        var nh = e.numHorses || 18;
+        validCombos = originalCombos.filter(function(c){
+          return isBracketQValid(c, excluded, nh);
+        });
+      } else {
+        // その他：除外馬を含む組み合わせを除く
+        validCombos = originalCombos.filter(function(c){
+          return !c.some(function(h){ return excluded.indexOf(h) >= 0; });
+        });
+      }
+      var excludedCount = originalCombos.length - validCombos.length;
+      var newRefund = excludedCount * e.unitAmount;
+      S.balance -= (e.refund || 0);
+      e.refund = newRefund;
+      S.balance += newRefund;
+      totalRefund += newRefund;
+      e.combos = validCombos;
+      e.totalAmount = e.unitAmount * validCombos.length;
+    }
+  });
+  save(); renderBal(); renderHistory();
+  if(excluded.length === 0){
+    showToast("除外を解除しました");
+  } else {
+    showToast(excluded.join(",")+"番除外 → 返還 "+fmt(totalRefund));
+  }
 }
 
 function initSettings(){

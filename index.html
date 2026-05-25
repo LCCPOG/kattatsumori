@@ -753,26 +753,26 @@ function renderHistory(){
 function renderSelDisplay(entry){
   var m=entry.method.id,sel=entry.sel||{};
   var lines=[];
+  var srt=function(arr){return(arr||[]).slice().sort(function(a,b){return a-b;});};
 
   if(m==="axis1"||m==="axis1m"){
-    var ax=(sel.axis||[]).join(",");
-    var pt=(sel.partner||[]).join(",");
+    var ax=srt(sel.axis).join(", ");
+    var pt=srt(sel.partner).join(", ");
     if(ax)lines.push('<div class="sel-line"><span class="sel-role">軸</span><span class="sel-nums">'+ax+'</span></div>');
     if(pt)lines.push('<div class="sel-line"><span class="sel-role">相手</span><span class="sel-nums">'+pt+'</span></div>');
   } else if(m==="axis2"||m==="axis2m"){
-    var ax=(sel.axis||[]).join(",");
-    var pt=(sel.partner||[]).join(",");
+    var ax=srt(sel.axis).join(", ");
+    var pt=srt(sel.partner).join(", ");
     if(ax)lines.push('<div class="sel-line"><span class="sel-role">軸</span><span class="sel-nums">'+ax+'</span></div>');
     if(pt)lines.push('<div class="sel-line"><span class="sel-role">相手</span><span class="sel-nums">'+pt+'</span></div>');
   } else if(m==="form"){
-    var r1=(sel.row1||[]).join(",");
-    var r2=(sel.row2||[]).join(",");
-    var r3=(sel.row3||[]).join(",");
+    var r1=srt(sel.row1).join(", ");
+    var r2=srt(sel.row2).join(", ");
+    var r3=srt(sel.row3).join(", ");
     if(r1)lines.push('<div class="sel-line"><span class="sel-role">1列目</span><span class="sel-nums">'+r1+'</span></div>');
     if(r2)lines.push('<div class="sel-line"><span class="sel-role">2列目</span><span class="sel-nums">'+r2+'</span></div>');
     if(r3)lines.push('<div class="sel-line"><span class="sel-role">3列目</span><span class="sel-nums">'+r3+'</span></div>');
   } else {
-    // 通常・BOX → 組み合わせ表示
     return null;
   }
   return lines.length ? '<div class="sel-display">'+lines.join("")+'</div>' : null;

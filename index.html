@@ -67,6 +67,13 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:-apple-sy
 .excl-btn{width:40px;height:40px;border-radius:var(--r);border:1px solid var(--bd2);background:var(--sf);color:var(--tx);font-size:13px;font-weight:600;cursor:pointer}
 .excl-btn.sel{border-color:var(--or);background:var(--or-bg);color:var(--or)}
 .excl-apply-btn{width:100%;padding:11px;border-radius:50px;background:var(--or);color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer}
+.week-shortcuts{display:flex;flex-direction:column;gap:8px}
+.week-btn{display:flex;align-items:center;gap:12px;width:100%;padding:13px 16px;border-radius:var(--rl);border:1.5px solid var(--bd2);background:var(--sf);cursor:pointer;text-align:left}
+.week-btn.sel{border-color:var(--ac);background:var(--ac-bg)}
+.week-btn-day{font-size:15px;font-weight:800;color:#3b82f6;width:20px;flex-shrink:0}
+.week-btn.sun-btn .week-btn-day{color:var(--rd)}
+.week-btn.sel .week-btn-day{color:var(--ac-tx)}
+.week-btn-date{font-size:13px;font-weight:600;color:var(--tx)}
 .hnum{width:32px;height:32px;border-radius:50%;background:var(--sf2);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--tx)}
 .hbtn.sn .hnum{background:#4a8a6e;color:#fff}
 .hbtn.sa .hnum{background:var(--gd);color:#000}
@@ -500,8 +507,37 @@ function renderDate(){
   var leg=ce("div","cal-leg");var ldot=ce("span","ldot");leg.appendChild(ldot);leg.appendChild(document.createTextNode(" 購入済みの日"));cal.appendChild(leg);
   wrap.appendChild(cal);
   if(S.selDate){var pill=ce("div","hpill");pill.textContent="📅 "+fmtD(S.selDate)+"を選択中";wrap.appendChild(pill);}
-}
 
+  // 今週の土日ショートカット
+  var _today=new Date();
+  var _dow=_today.getDay(); // 0=日,6=土
+  var _diffToMon=_dow===0?-6:1-_dow;
+  var _mon=new Date(_today);_mon.setDate(_today.getDate()+_diffToMon);
+  var _sat=new Date(_mon);_sat.setDate(_mon.getDate()+5);
+  var _sun=new Date(_mon);_sun.setDate(_mon.getDate()+6);
+  var _satKey=dk(_sat),_sunKey=dk(_sun);
+  var _satLbl=(_sat.getMonth()+1)+"月"+_sat.getDate()+"日（土）";
+  var _sunLbl=(_sun.getMonth()+1)+"月"+_sun.getDate()+"日（日）";
+
+  var _sec=ce("p","sec","今週のレース");wrap.appendChild(_sec);
+  var _sw=ce("div","week-shortcuts");
+
+  var _sb=ce("button","week-btn"+(S.selDate===_satKey?" sel":""));
+  var _sd=ce("span","week-btn-day");_sd.textContent="土";
+  var _sl=ce("span","week-btn-date");_sl.textContent=_satLbl;
+  _sb.appendChild(_sd);_sb.appendChild(_sl);
+  (function(k){_sb.addEventListener("click",function(){S.selDate=k;S.step=1;renderAll();});})(satKey=_satKey);
+  _sw.appendChild(_sb);
+
+  var _ub=ce("button","week-btn sun-btn"+(S.selDate===_sunKey?" sel":""));
+  var _ud=ce("span","week-btn-day");_ud.textContent="日";
+  var _ul=ce("span","week-btn-date");_ul.textContent=_sunLbl;
+  _ub.appendChild(_ud);_ub.appendChild(_ul);
+  (function(k){_ub.addEventListener("click",function(){S.selDate=k;S.step=1;renderAll();});})(sunKey=_sunKey);
+  _sw.appendChild(_ub);
+
+  wrap.appendChild(_sw);
+}
 // ─── 競馬場 ────────────────────────────────────────────
 function renderVenue(){
   var wrap=ge("sp-venue");wrap.innerHTML="";

@@ -167,6 +167,14 @@ html,body{height:100%;background:var(--bg);color:var(--tx);font-family:-apple-sy
 .hist-race-title{font-size:14px;font-weight:700}
 .hist-ticket-wrap{display:flex;flex-direction:column;gap:8px}
 .bracket-lbl{display:block;font-size:9px;color:var(--mt)}
+.bracket-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.frame-btn{border-radius:var(--r);border:1.5px solid var(--bd);background:var(--sf);cursor:pointer;overflow:hidden;display:flex;flex-direction:column;min-height:72px;padding:0}
+.frame-btn.sel{border:2px solid var(--ac);background:var(--ac-bg)}
+.frame-bar{height:8px;width:100%;flex-shrink:0;position:relative}
+.frame-num{font-size:14px;font-weight:800;padding:6px 4px 2px;text-align:center}
+.frame-cnt{font-size:10px;color:var(--mt);font-weight:500;padding-bottom:6px;text-align:center}
+.zoro-badge{position:absolute;right:2px;top:50%;transform:translateY(-50%);font-size:8px;background:rgba(0,0,0,.5);color:#fff;padding:1px 3px;border-radius:3px}
+.frame-sel-info{font-size:12px;color:var(--ac-tx);font-weight:600;padding:6px 10px;background:var(--ac-bg);border-radius:var(--r);margin-bottom:8px}
 .sel-display{display:flex;flex-direction:column;gap:5px;margin:6px 0}
 .sel-line{display:flex;align-items:baseline;gap:8px}
 .sel-role{font-size:11px;font-weight:700;color:var(--mt);flex-shrink:0;min-width:42px}
@@ -317,7 +325,7 @@ var LEGENDS={"axis1-2":[["var(--gd)","軸"],["var(--gn)","相手"]],"axis1-3":[[
 var STEP_ICONS=["📅","📍","🏁","🎫","🐴","💴","✓"];
 var STEP_LBLS=["日付","競馬場","レース","馬券","馬番","金額","確認"];
 
-var S={step:0,selDate:null,calY:new Date().getFullYear(),calM:new Date().getMonth(),venue:null,race:null,betType:null,method:"normal",sel:{},amount:100,history:[],balance:10000,histView:"dates",histDate:null,histRaceKey:null,numHorses:18,formRow:1};
+var S={step:0,selDate:null,calY:new Date().getFullYear(),calM:new Date().getMonth(),venue:null,race:null,betType:null,method:"normal",sel:{},amount:100,history:[],balance:10000,histView:"dates",histDate:null,histRaceKey:null,numHorses:18,formRow:1,bracketMode:"frame"};
 
 // ─── ユーティリティ ────────────────────────────────────
 function fmt(n){return"\u00a5"+Math.round(n).toLocaleString();}
@@ -337,10 +345,20 @@ function genCombos(btId,method,sel){
   if(method==="normal"){
     if(btId==="win"||btId==="place")return hs.map(function(h){return[h];});
     if(btId==="bracketQ"){
+      // 枠番直接選択モード: hs[0]が枠番そのもの(normal/axis1)
+      // または馬番2頭選択モードは廃止、枠番グリッドに変更済み
+      if(hs.length<1)return[];
+      if(S.bracketMode==="frame"){
+        // 枠番直接選択: hs=[選んだ枠番...]
+        if(hs.length<2)return[];
+        var fa=hs[0],fb=hs[1];
+        return[[Math.min(fa,fb),Math.max(fa,fb)]];
+      }
+      // 旧方式フォールバック
       if(hs.length<2)return[];
       var bmap=getBracketMap(S.numHorses);
       var b1=bmap[hs[0]]||BM[hs[0]],b2=bmap[hs[1]]||BM[hs[1]];
-      return b1===b2?[]:[[Math.min(b1,b2),Math.max(b1,b2)]];
+      return[[Math.min(b1,b2),Math.max(b1,b2)]];
     }
     if(btId==="quinella"||btId==="wide")return hs.length>=2?[[Math.min(hs[0],hs[1]),Math.max(hs[0],hs[1])]]:[];
     if(btId==="exacta")return hs.length>=2?[hs.slice(0,2)]:[];
@@ -350,10 +368,21 @@ function genCombos(btId,method,sel){
   }
   if(method==="box"){
     if(btId==="bracketQ"){
+      // BOX: 選んだ枠番の全組み合わせ（ゾロ目含む）
       var bmap2=getBracketMap(S.numHorses);
-      var pairs=combs(hs,2).map(function(c){var b1=bmap2[c[0]]||BM[c[0]],b2=bmap2[c[1]]||BM[c[1]];return b1===b2?null:[Math.min(b1,b2),Math.max(b1,b2)];}).filter(function(x){return x!==null;});
-      // 重複除去
-      var seen={},uniq=[];pairs.forEach(function(p){var k=p.join("-");if(!seen[k]){seen[k]=1;uniq.push(p);}});return uniq;
+      var bracketCounts2={};for(var hh=1;hh<=S.numHorses;hh++){var brr=bmap2[hh];bracketCounts2[brr]=(bracketCounts2[brr]||0)+1;}
+      // hs は枠番リスト（bracketModeがframeの場合）
+      var frames=hs; // 枠番として扱う
+      var seen={},uniq=[];
+      for(var fi=0;fi<frames.length;fi++){
+        for(var fj=fi;fj<frames.length;fj++){
+          var fa2=frames[fi],fb2=frames[fj];
+          if(fa2===fb2&&(bracketCounts2[fa2]||0)<2)continue; // 同枠ゾロ目は2頭以上必要
+          var k=[Math.min(fa2,fb2),Math.max(fa2,fb2)].join("-");
+          if(!seen[k]){seen[k]=1;uniq.push([Math.min(fa2,fb2),Math.max(fa2,fb2)]);}
+        }
+      }
+      return uniq;
     }
     if(btId==="quinella"||btId==="wide")return combs(hs,2).map(function(c){return[Math.min(c[0],c[1]),Math.max(c[0],c[1])];});
     if(btId==="exacta")return perms(hs).filter(function(p){return p.length===2;});
@@ -365,7 +394,22 @@ function genCombos(btId,method,sel){
     if(ax.length===0)return[];
     var a0=ax[0];
     if(method==="axis1"){
-      if(btId==="bracketQ"||btId==="quinella"||btId==="wide")return pt.filter(function(p){return p!==a0;}).map(function(p){return[Math.min(a0,p),Math.max(a0,p)];});
+      if(btId==="bracketQ"){
+        // 軸流し枠連: 軸枠a0と相手枠ptで組み合わせ（ゾロ目OK）
+        var bmap3=getBracketMap(S.numHorses);
+        var bc3={};for(var hh3=1;hh3<=S.numHorses;hh3++){var br3=bmap3[hh3];bc3[br3]=(bc3[br3]||0)+1;}
+        var seen3={},uniq3=[];
+        pt.filter(function(p){return p!==a0;}).forEach(function(p){
+          var k=[Math.min(a0,p),Math.max(a0,p)].join("-");
+          if(!seen3[k]){seen3[k]=1;uniq3.push([Math.min(a0,p),Math.max(a0,p)]);}
+        });
+        // ゾロ目（相手に軸と同じ枠が含まれていて2頭以上いる場合）
+        if(pt.indexOf(a0)>=0&&(bc3[a0]||0)>=2){
+          var kz=a0+"-"+a0;if(!seen3[kz]){seen3[kz]=1;uniq3.push([a0,a0]);}
+        }
+        return uniq3;
+      }
+      if(btId==="quinella"||btId==="wide")return pt.filter(function(p){return p!==a0;}).map(function(p){return[Math.min(a0,p),Math.max(a0,p)];});
       if(btId==="exacta")return pt.filter(function(p){return p!==a0;}).map(function(p){return[a0,p];});
       if(btId==="trio")return combs(pt.filter(function(p){return p!==a0;}),2).map(function(c){return[a0].concat(c).sort(function(a,b){return a-b;});});
       if(btId==="trifecta")return perms(pt.filter(function(p){return p!==a0;})).filter(function(p){return p.length===2;}).map(function(p){return[a0].concat(p);});
@@ -595,6 +639,35 @@ function getOrd(n){
   if(S.method==="normal"&&S.betType&&(S.betType.id==="exacta"||S.betType.id==="trifecta")){var idx=(S.sel.horses||[]).indexOf(n);return idx>=0?idx+1:null;}
   return null;
 }
+function toggleFrameBtn(f){
+  var hs=S.sel.horses||[];
+  var bmap=getBracketMap(S.numHorses);
+  var bc={};for(var hh=1;hh<=S.numHorses;hh++){var br=bmap[hh];bc[br]=(bc[br]||0)+1;}
+  if(hs.length===0){
+    // 1枠目を選択
+    S.sel.horses=[f];
+  } else if(hs.length===1){
+    if(hs[0]===f){
+      // 同じ枠を2回タップ → ゾロ目（2頭以上いる枠のみ）
+      if((bc[f]||0)>=2){S.sel.horses=[f,f];}
+      else{S.sel.horses=[];} // 1頭しかいない枠は解除
+    } else {
+      // 別の枠を選択 → 確定
+      S.sel.horses=[Math.min(hs[0],f),Math.max(hs[0],f)];
+    }
+  } else {
+    // 選択済み → タップでリセットして選び直し
+    S.sel.horses=[f];
+  }
+  renderHorses();
+}
+
+// ゾロ目ボタン（同枠選択ショートカット）
+function selectZoro(f){
+  S.sel.horses=[f,f];
+  renderHorses();
+}
+
 function toggleH(n){
   var m=S.method,bt=S.betType;
   if(m==="normal"||m==="box"){if(!S.sel.horses)S.sel.horses=[];var idx=S.sel.horses.indexOf(n);if(idx>=0)S.sel.horses.splice(idx,1);else if(m==="normal"){if(S.sel.horses.length<bt.minSel)S.sel.horses.push(n);else{S.sel.horses.shift();S.sel.horses.push(n);}}else S.sel.horses.push(n);}
@@ -608,8 +681,10 @@ function toggleH(n){
 function updateHorsesUI(){
   var bt=S.betType;
   var pts=genCombos(bt.id,S.method,S.sel).length;
+  // 枠連は枠番グリッドなのでrenderHorsesを直接呼ぶ
+  if(bt.id==="bracketQ"){renderHorses();return;}
   // 馬番ボタンの色更新
-  var activeBM2=(bt.id==="bracketQ")?getBracketMap(S.numHorses):BM;
+  var activeBM2=BM;
   for(var n=1;n<=18;n++){
     var btn=ge("hbtn-"+n);
     if(!btn)continue;
@@ -701,21 +776,62 @@ function renderHorses(){
   pd.appendChild(ce("span",null,hint));pd.appendChild(ce("strong",null,pts+"点"));
   w.appendChild(pd);
   // 馬グリッド（一度だけ生成、以降はupdateHorsesUIで色だけ変える）
-  var activeBM=(bt.id==="bracketQ")?getBracketMap(S.numHorses):BM;
-  var maxHorse=(bt.id==="bracketQ")?S.numHorses:18;
-  var grid=ce("div","hgrid");
-  for(var n=1;n<=maxHorse;n++){
-    var br=activeBM[n]||1,cls=getHorseCls(n),ord=getOrd(n);
-    var hbtn=ce("button","hbtn"+(cls?" "+cls:""));
-    hbtn.id="hbtn-"+n;
-    if(ord){var odot=ce("div","odot",ord);hbtn.appendChild(odot);}
-    var hnum=ce("div","hnum",n);hbtn.appendChild(hnum);
-    var hbr=ce("span","hbr");hbr.style.background=BC[br]||"#999";hbr.style.border="1px solid rgba(0,0,0,.25)";hbtn.appendChild(hbr);
-    if(bt.id==="bracketQ"){var blbl=ce("span","bracket-lbl");blbl.textContent=br+"枠";blbl.style.cssText="font-size:9px;color:var(--mt);font-weight:500";hbtn.appendChild(blbl);}
-    (function(num){hbtn.addEventListener("click",function(){toggleH(num);});})(n);
-    grid.appendChild(hbtn);
+  if(bt.id==="bracketQ"){
+    // 枠番グリッド（1〜8枠）
+    var bmap4=getBracketMap(S.numHorses);
+    // 各枠の頭数を計算
+    var bracketCounts={};
+    for(var h=1;h<=S.numHorses;h++){var br4=bmap4[h];bracketCounts[br4]=(bracketCounts[br4]||0)+1;}
+    var bgrid=ce("div","bracket-grid");
+    var selFrames=S.sel.horses||[];
+    for(var f=1;f<=8;f++){
+      var cnt=bracketCounts[f]||0;
+      if(cnt===0)continue; // その枠が存在しない場合はスキップ
+      var isSel1=selFrames[0]===f,isSel2=selFrames[1]===f;
+      var isSelAny=selFrames.indexOf(f)>=0;
+      var fbtn=ce("button","frame-btn"+(isSelAny?" sel":""));
+      fbtn.style.setProperty("--fc",BC[f]||"#999");
+      // 枠番バー
+      var fbar=ce("div","frame-bar");fbar.style.background=BC[f]||"#999";
+      // 枠番テキスト
+      var fnum=ce("div","frame-num",f+"枠");
+      fnum.style.color=f===1||f===5?"#333":"#fff";
+      if(BC[f]==="#f0f0f0"||BC[f]==="#e8d000")fnum.style.color="#333";
+      // 頭数テキスト
+      var fcnt=ce("div","frame-cnt",cnt+"頭");
+      // ゾロ目バッジ
+      if(selFrames.length===2&&selFrames[0]===f&&selFrames[1]===f){
+        var zbadge=ce("div","zoro-badge","ゾロ目");fbar.appendChild(zbadge);
+      }
+      fbtn.appendChild(fbar);fbtn.appendChild(fnum);fbtn.appendChild(fcnt);
+      (function(frame){fbtn.addEventListener("click",function(){toggleFrameBtn(frame);});})(f);
+      bgrid.appendChild(fbtn);
+    }
+    w.appendChild(bgrid);
+    // 選択状態の表示
+    var fsel=S.sel.horses||[];
+    if(fsel.length>0){
+      var finfo=ce("div","frame-sel-info");
+      var txt=fsel.length===1?(fsel[0]+"枠を選択中 → もう1枠選択（同枠でゾロ目も可）"):(fsel[0]===fsel[1]?fsel[0]+"枠-"+fsel[1]+"枠（ゾロ目）":fsel[0]+"枠-"+fsel[1]+"枠");
+      finfo.textContent=txt;
+      w.appendChild(finfo);
+    }
+  } else {
+    var activeBM=(bt.id==="bracketQ")?getBracketMap(S.numHorses):BM;
+    var maxHorse=18;
+    var grid=ce("div","hgrid");
+    for(var n=1;n<=maxHorse;n++){
+      var br=activeBM[n]||1,cls=getHorseCls(n),ord=getOrd(n);
+      var hbtn=ce("button","hbtn"+(cls?" "+cls:""));
+      hbtn.id="hbtn-"+n;
+      if(ord){var odot=ce("div","odot",ord);hbtn.appendChild(odot);}
+      var hnum=ce("div","hnum",n);hbtn.appendChild(hnum);
+      var hbr=ce("span","hbr");hbr.style.background=BC[br]||"#999";hbr.style.border="1px solid rgba(0,0,0,.25)";hbtn.appendChild(hbr);
+      (function(num){hbtn.addEventListener("click",function(){toggleH(num);});})(n);
+      grid.appendChild(hbtn);
+    }
+    w.appendChild(grid);
   }
-  w.appendChild(grid);
   // 「金額入力へ」ボタン（pts>0のときだけ）
   if(pts>0){
     var goBtn=ce("button","btnp","金額入力へ →");
